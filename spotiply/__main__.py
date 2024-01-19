@@ -3,13 +3,16 @@ Create a spotify playlist based on the mp3 files in a directory.
 """
 
 import argparse
+import os
 from pathlib import Path
 from spotiply import music_dir_to_json, get_spotify_track_id, create_spotify_playlist
+
+THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def do_stuff(args):
     playlist_name = args.playlist_name
-    json_file = "data/" + playlist_name + ".json"
+    json_file = os.path.join(THIS_DIR, "..", "data",  playlist_name + ".json")
 
     p = Path(json_file).parent
     p.mkdir(parents=True, exist_ok=True)

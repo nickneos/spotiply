@@ -28,19 +28,6 @@ def music_dir_to_json(path, out_file):
     return songs
 
 
-def clean_song_title(title):
-    title = re.sub(r"\([^\)]*\)", "", title)
-    title = re.sub(r"\[[^\]]*\]", "", title)
-    title = re.sub(r"[^0-9a-zA-Z ]+", "", title.lower())
-    return title.strip()
-
-
-def clean_artist(artist):
-    artist = artist.lower().split(" ft ")[0].split(" & ")[0].split(" vs ")[0]
-    artist = re.sub(r"[^0-9a-zA-Z ]+", "", artist.lower())
-    return artist.strip()
-
-
 def get_spotify_track_id(json_file):
     # read song names from json file
     with open(json_file, "r", encoding="utf-8") as f:
@@ -183,6 +170,25 @@ def generate_credentials_json():
     print("\nSaved to", CREDENTIALS)
 
 
+def clean_song_title(title):
+    title = re.sub(r"\([^\)]*\)", "", title)
+    title = re.sub(r"\[[^\]]*\]", "", title)
+    title = re.sub(r"[^0-9a-zA-Z ]+", "", title.lower())
+    return title.strip()
+
+
+def clean_artist(artist):
+    artist = (
+        artist.lower()
+        .split(" ft ")[0]
+        .split(" feat ")[0]
+        .split(" & ")[0]
+        .split(" vs ")[0]
+    )
+    artist = re.sub(r"[^0-9a-zA-Z ]+", "", artist.lower())
+    return artist.strip()
+
+
 if __name__ == "__main__":
     # path = "/home/nickneos/Music/Collections/Neos' Old School Urban Collection/"
     # path = "/home/nickneos/Music/Collections/90s & early 2000s Dance/Neos' Old School Dance Collection/"
@@ -193,6 +199,4 @@ if __name__ == "__main__":
     # get_spotify_track_id(j_file)
     # create_spotify_playlist(playlist_name, j_file)
 
-    # print(clean_song_title("this is A TEST!!!! (remix)"))
-    # print(clean_song_title("this is A TEST!!!! (remix) [remix] (2)"))
     generate_credentials_json()

@@ -5,7 +5,7 @@ Allows you to create a spotify playlist based on the mp3 files in a directory.
 ## Usage:
 
 
-```bash
+```
 python spotiply [-h] [-c | -dp | -j json_file] [music_dir] [playlist_name]
 ```
 

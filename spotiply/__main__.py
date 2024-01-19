@@ -5,7 +5,7 @@ Create a spotify playlist based on the mp3 files in a directory.
 import argparse
 import os
 from pathlib import Path
-from spotiply import *
+from core import *
 from uuid import uuid4
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))

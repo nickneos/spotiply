@@ -187,16 +187,3 @@ def clean_artist(artist):
     )
     artist = re.sub(r"[^0-9a-zA-Z ]+", "", artist.lower())
     return artist.strip()
-
-
-if __name__ == "__main__":
-    # path = "/home/nickneos/Music/Collections/Neos' Old School Urban Collection/"
-    # path = "/home/nickneos/Music/Collections/90s & early 2000s Dance/Neos' Old School Dance Collection/"
-    # playlist_name = "test123"  # str(uuid.uuid4())
-    # j_file = playlist_name + ".json"
-
-    # music_dir_to_json(path, j_file)
-    # get_spotify_track_id(j_file)
-    # create_spotify_playlist(playlist_name, j_file)
-
-    generate_credentials_json()

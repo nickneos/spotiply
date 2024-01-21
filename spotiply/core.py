@@ -39,40 +39,50 @@ def get_spotify_track_id(json_file):
     # loop over song names and search for them on spotify
     print("Searching for songs...")
     for song in tqdm(songs):
-        try:
-            artist = clean_artist(song["artist"])
-            title = clean_song_title(song["title"])
-        except KeyError:
-            continue
+        result = search_spotify_song(sp, song["artist"], song["title"])
 
-        # build query search string
-        query = f"{title} artist:{artist}"
-        # query = urllib.parse.quote(query, safe=":")
-
-        try:
-            # we'll assume first result is correct and save its id
-            results = sp.search(q=query, limit=1, type="track")
-            result = results["tracks"]["items"][0]
-        except IndexError:
+        if result:
+            song["spotify"] = {
+                "id": result["id"],
+                "artist": result["artist"],
+                "title": result["title"],
+            }
+        else:
             log_not_found(
                 f"{song['artist']} - {song['title']}",
-                Path(json_file).parent.joinpath(
-                    Path(json_file).stem + "-not_found.txt"
-                ),
+                Path(json_file).parent.joinpath(Path(json_file).stem + "-not_found.txt"),
             )
-            continue
 
-        song["spotify"] = {
-            "id": result["id"],
-            "artist": result["artists"][0]["name"],
-            "title": result["name"],
-        }
-
-    # read song names from text file
+    # update json file with spotify details
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(songs, f, indent=4)
 
     return songs
+
+
+def search_spotify_song(sp, artist, title):
+    try:
+        artist = clean_artist(artist)
+        title = clean_song_title(title)
+    except KeyError:
+        return None
+
+    # build query search string
+    query = f"{title} artist:{artist}"
+    # query = urllib.parse.quote(query, safe=":")
+
+    try:
+        # we'll assume first result is correct and save its id
+        results = sp.search(q=query, limit=1, type="track")
+        result = results["tracks"]["items"][0]
+    except IndexError:
+        return None
+
+    return {
+        "id": result["id"],
+        "artist": result["artists"][0]["name"],
+        "title": result["name"],
+    }
 
 
 def create_spotify_playlist(playlist_name, json_file):
@@ -187,3 +197,10 @@ def clean_artist(artist):
     )
     artist = re.sub(r"[^0-9a-zA-Z ]+", "", artist.lower())
     return artist.strip()
+
+print(
+
+search_spotify_song(spotify_connect(), "Daft Punk", "One More Time"),
+search_spotify_song(spotify_connect(), "afadsf", "adfsasdf"),
+sep="\n"
+)

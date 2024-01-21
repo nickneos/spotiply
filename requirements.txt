@@ -1,2 +1,3 @@
 tqdm
 spotipy
+eyed3

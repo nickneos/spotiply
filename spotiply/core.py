@@ -4,11 +4,13 @@ import time
 import spotipy
 import json
 import re
+from spotipy import util
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 from pathlib import Path
 
 CREDENTIALS = "credentials.json"
+SPOTIFY_TRACK_URL = "https://open.spotify.com/track/"
 
 
 def music_dir_to_json(path, out_file):
@@ -28,13 +30,10 @@ def music_dir_to_json(path, out_file):
     return songs
 
 
-def get_spotify_track_id(json_file):
+def get_spotify_track_id(sp, json_file):
     # read song names from json file
     with open(json_file, "r", encoding="utf-8") as f:
         songs = json.load(f)
-
-    # connect to spotify
-    sp = spotify_connect()
 
     # loop over song names and search for them on spotify
     print("Searching for songs...")
@@ -46,11 +45,14 @@ def get_spotify_track_id(json_file):
                 "id": result["id"],
                 "artist": result["artist"],
                 "title": result["title"],
+                "url": result["url"],
             }
         else:
             log_not_found(
                 f"{song['artist']} - {song['title']}",
-                Path(json_file).parent.joinpath(Path(json_file).stem + "-not_found.txt"),
+                Path(json_file).parent.joinpath(
+                    Path(json_file).stem + "-not_found.txt"
+                ),
             )
 
     # update json file with spotify details
@@ -82,15 +84,14 @@ def search_spotify_song(sp, artist, title):
         "id": result["id"],
         "artist": result["artists"][0]["name"],
         "title": result["name"],
+        "url": SPOTIFY_TRACK_URL + result["id"],
     }
 
 
-def create_spotify_playlist(playlist_name, json_file):
+def create_spotify_playlist(sp, playlist_name, json_file):
     # read song names from json file
     with open(json_file, "r", encoding="utf-8") as f:
         songs = json.load(f)
-
-    sp = spotify_connect()
 
     # generate list of song_ids
     song_ids = []
@@ -145,14 +146,19 @@ def spotify_connect():
     with open(CREDENTIALS, "r", encoding="utf-8") as f:
         credentials = json.load(f)
 
+    client_id = credentials["client_id"]
+    client_secret = credentials["client_secret"]
+    redirect_uri = credentials["redirect_uri"]
+    scope = "playlist-read-private playlist-modify-private user-library-read"
+    # change to appropriate scope if playlist is public
+    # more about scopes: https://developer.spotify.com/documentation/general/guides/scopes/
+
     return spotipy.Spotify(
         auth_manager=SpotifyOAuth(
-            client_id=credentials["client_id"],
-            client_secret=credentials["client_secret"],
-            redirect_uri=credentials["redirect_uri"],
-            scope="playlist-read-private playlist-modify-private",  # change to appropriate scope if playlist is public
-            # more about scopes:
-            # https://developer.spotify.com/documentation/general/guides/scopes/
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri,
+            scope=scope,
         )
     )
 
@@ -180,6 +186,43 @@ def generate_credentials_json():
     print("\nSaved to", CREDENTIALS)
 
 
+def get_liked_songs(sp, json_out, urls=False):
+    # get the songs
+    results = []
+    batch_size = 50  # 50 is the most spotify will return at a time
+    counter = 0
+
+    if sp:
+        for i in range(0, 10000000, batch_size):
+            response = sp.current_user_saved_tracks(offset=i, limit=batch_size)
+            if len(response["items"]) == 0:
+                break
+
+            for item in response["items"]:
+                counter += 1
+                track_info = {
+                    "id": item["track"]["id"],
+                    "artist": item["track"]["artists"][0]["name"],
+                    "title": item["track"]["name"],
+                    "url": SPOTIFY_TRACK_URL + item["track"]["id"],
+                    "track_num": counter,
+                }
+                results.append(track_info)
+
+    # dump to json
+    with open(json_out, "w", encoding="utf-8") as fp:
+        json.dump(results, fp, indent=2)
+
+    if urls:
+        urls = [track["url"] for track in results]
+        filename = os.path.join(Path(json_out).parent, Path(json_out).stem + ".urls")
+        with open(filename, "w", encoding="utf-8") as f:
+            for url in urls:
+                f.write(f"{url}\n")
+
+    return results
+
+
 def clean_song_title(title):
     title = re.sub(r"\([^\)]*\)", "", title)
     title = re.sub(r"\[[^\]]*\]", "", title)
@@ -197,10 +240,3 @@ def clean_artist(artist):
     )
     artist = re.sub(r"[^0-9a-zA-Z ]+", "", artist.lower())
     return artist.strip()
-
-print(
-
-search_spotify_song(spotify_connect(), "Daft Punk", "One More Time"),
-search_spotify_song(spotify_connect(), "afadsf", "adfsasdf"),
-sep="\n"
-)

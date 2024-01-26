@@ -1,5 +1,6 @@
 data/
-credentials.json
+*.json
+*.csv
 .cache
 
 # Byte-compiled / optimized / DLL files

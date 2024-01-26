@@ -6,6 +6,7 @@ import argparse
 import os
 from pathlib import Path
 from core import *
+from genres import *
 from uuid import uuid4
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -14,6 +15,9 @@ THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 def do_stuff(args):
     if args.credentials:
         generate_credentials_json()
+    elif args.clean_tags:
+        path = "." if args.music_dir == "" else args.music_dir
+        clean_tags(path)
     else:
         path = "." if args.music_dir == "" else args.music_dir
         playlist_name = uuid4().hex if args.playlist_name == "" else args.playlist_name
@@ -89,6 +93,12 @@ if __name__ == "__main__":
         dest="disable_playlist",
         action="store_true",
         help="Do all tasks, except creating the actual spotify playlist",
+    )
+    group1.add_argument(
+        "--clean-tags",
+        dest="clean_tags",
+        action="store_true",
+        help="Clean the tag information for mp3 files in path",
     )
 
     parser.set_defaults(func=do_stuff)

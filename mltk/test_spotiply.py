@@ -1,4 +1,4 @@
-from core import *
+from spotiply import *
 
 
 def test_clean_song_title():

@@ -9,7 +9,7 @@ import logging
 from bs4 import BeautifulSoup
 from pathlib import Path
 from tqdm import tqdm
-from core import spotify_connect
+from mltk.spotiply import spotify_connect
 from fuzzywuzzy import process
 
 URL = "https://www.chosic.com/list-of-music-genres/"

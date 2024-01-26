@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 from tqdm import tqdm
 from core import spotify_connect
+from fuzzywuzzy import process
 
 URL = "https://www.chosic.com/list-of-music-genres/"
 HEADERS = {
@@ -62,6 +63,12 @@ def clean_genres(path):
             genre_dict[k] = "techno"
         elif "hardstyle" in k.lower() and v.strip().lower() == "electronic":
             genre_dict[k] = "hardstyle"
+        elif "dance" in k.lower() and v.strip().lower() == "electronic":
+            genre_dict[k] = "dance"
+
+    # some additions
+    genre_dict["top 40"] = "pop"
+    genre_dict["club"] = "club"
 
     # dump to json file
     with open(path, "w", encoding="utf-8") as fp:
@@ -70,41 +77,49 @@ def clean_genres(path):
     return genre_dict
 
 
-def clean_tag(audio):
+def clean_tag(audio, debug=False):
     audio = eyed3.load(audio)
 
     # update year
-    if audio.tag.original_release_date:
-        audio.tag.recording_date = audio.tag.original_release_date
+    if not debug:
+        if audio.tag.original_release_date:
+            audio.tag.recording_date = audio.tag.original_release_date
 
     # update genre
     if audio.tag.genre:
         genre = audio.tag.genre.name
 
-        #  copy original genre to comments
-        if audio.tag.comments.get("") is None:
-            audio.tag.comments.set(f"zspotify;{genre};")
-
         update_to = map_genre(genre)
         update_to = "hip-hop" if update_to == "hip hop" else update_to
-        audio.tag.genre = update_to
+        
+        if debug:
+            print("\n" + Path(audio.path).name)
+            print(genre, "->", update_to)
+        else:
+            #  copy original genre to comments
+            if not debug and audio.tag.comments.get("genre") is None:
+                audio.tag.comments.set(f"{genre}", "genre")
 
-    # save tag
-    audio.tag.save(preserve_file_time=True)
+            # actually update the genre tag
+            if update_to:
+                audio.tag.genre = update_to
+
+            # save tag
+            try:
+                audio.tag.save(preserve_file_time=True)
+            except NotImplementedError:
+                print("Issue saving tag...skipping: ", audio.path)
 
 
-def clean_tags(path):
+def clean_tags(path, debug=False):
     logging.getLogger("eyed3").setLevel(logging.ERROR)
+
     paths = [x for x in Path(path).rglob("*.mp3")]
-    for audio in tqdm(paths):
-        clean_tag(audio)
-
-
-def map_genre(genre, genres_json="/home/nickneos/projects/spotiply/genres.json"):
-    with open(genres_json, "r", encoding="utf-8") as fp:
-        genre_dict = json.load(fp)
-
-    return genre_dict.get(genre.lower().strip())
+    if not debug:
+        paths = tqdm(paths)
+    
+    for audio in paths:
+        clean_tag(audio, debug)
 
 
 def get_spotify_genres_from_song_archive(
@@ -133,7 +148,7 @@ def get_spotify_genres_from_song_archive(
             if row[2] not in artists_in_csv:
                 song = sp.track(row[0])
                 artist_id = song["artists"][0]["id"]
-                time.sleep(1)
+                time.sleep(5)
 
                 a = sp.artist(artist_id)
                 values = [artist_id, a["name"], a["genres"]]
@@ -145,9 +160,34 @@ def get_spotify_genres_from_song_archive(
                 artists_in_csv.append(a["name"])
 
 
+def map_genre(genre, genres_json="/home/nickneos/projects/spotiply/genres.json"):
+    with open(genres_json, "r", encoding="utf-8") as fp:
+        genre_dict = json.load(fp)
+    
+    # exact match
+    if g := genre_dict.get(genre.lower().strip()):
+        return g
+    # fuzzy match
+    else:
+        genres = [k for k, _ in genre_dict.items()]
+        results = process.extractBests(genre, genres, score_cutoff=87)
+        results = [x[0] for x in results]
+        results = [genre_dict.get(x.lower().strip()) for x in results]
+        return most_frequent(results)
+
+
+def most_frequent(list):
+    if len(list) > 0:
+        return max(set(list), key = list.count)
+    else:
+        return None    
+
+
 if __name__ == "__main__":
     # genres_json = "/home/nickneos/projects/spotiply/genres.json"
     # scrape_genres(genres_json)
     # clean_genres(genres_json)
-    # clean_tags("/home/nickneos/Music/DJ/collections/zspotify/other/")
-    get_spotify_genres_from_song_archive()
+    clean_tags("/home/nickneos/Music/DJ/DJ Services/")
+    
+    # get_spotify_genres_from_song_archive()
+    # print(map_genre("Electronic/Dance"))

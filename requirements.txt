@@ -1,3 +1,5 @@
 tqdm
 spotipy
 eyed3
+fuzzywuzzy
+python-Levenshtein

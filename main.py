@@ -10,9 +10,13 @@ from mltk.genres import clean_tags
 from uuid import uuid4
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
+DATA_DIR = os.path.join(THIS_DIR, "data/")
 
 
 def do_stuff(args):
+
+    # create data dir if doesnt exist 
+    Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
 
     if args.credentials:
         generate_credentials_json()
@@ -25,18 +29,14 @@ def do_stuff(args):
 
     elif args.create_playlist or args.use_json:
         playlist_name = uuid4().hex if args.playlist_name else args.playlist_name
-        json_file = os.path.join(THIS_DIR, "..", "data", playlist_name + ".json")
+        json_file = os.path.join(DATA_DIR, playlist_name + ".json")
         sp = spotify_connect()
-
-        # create data dir if doesnt exist 
-        p = Path(json_file).parent
-        p.mkdir(parents=True, exist_ok=True)
 
         if args.use_json:
             playlist_name = Path(args.use_json).stem
             create_spotify_playlist(sp, playlist_name, args.use_json)
         else:
-            music_dir_to_json(path, json_file)
+            music_dir_to_json(args.create_playlist, json_file)
             get_spotify_track_id(sp, json_file)
             if not args.disable_playlist:
                 create_spotify_playlist(sp, playlist_name, json_file)

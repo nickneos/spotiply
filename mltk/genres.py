@@ -9,7 +9,7 @@ import logging
 from bs4 import BeautifulSoup
 from pathlib import Path
 from tqdm import tqdm
-from mltk.spotiply import spotify_connect
+from .spotiply import spotify_connect
 from fuzzywuzzy import process
 
 URL = "https://www.chosic.com/list-of-music-genres/"
@@ -107,7 +107,7 @@ def clean_tag(audio, debug=False):
             # save tag
             try:
                 audio.tag.save(preserve_file_time=True)
-            except NotImplementedError:
+            except:
                 print("Issue saving tag...skipping: ", audio.path)
 
 
@@ -182,12 +182,3 @@ def most_frequent(list):
     else:
         return None    
 
-
-if __name__ == "__main__":
-    # genres_json = "/home/nickneos/projects/spotiply/genres.json"
-    # scrape_genres(genres_json)
-    # clean_genres(genres_json)
-    clean_tags("/home/nickneos/Music/DJ/DJ Services/")
-    
-    # get_spotify_genres_from_song_archive()
-    # print(map_genre("Electronic/Dance"))

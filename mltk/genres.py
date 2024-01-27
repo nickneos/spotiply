@@ -61,11 +61,20 @@ def scrape_genres(out_file=GENRES_JSON):
             genre_dict[k] = "Hardstyle"
         elif "dance" in k.lower() and v.strip().lower() == "electronic":
             genre_dict[k] = "dance"
-        elif k.lower() == "electro" and v.strip().lower() == "hip hop":
-            genre_dict[k] = "electronic"
+        elif "electro house" in k.lower() and v.strip().lower() == "electronic":
+            genre_dict[k] = "electro"
+        elif "melbourne bounce" in k.lower() and v.strip().lower() == "electronic":
+            genre_dict[k] = "electro"
+        elif "dutch house" in k.lower() and v.strip().lower() == "electronic":
+            genre_dict[k] = "electro"
+        elif "big room" in k.lower() and v.strip().lower() == "electronic":
+            genre_dict[k] = "electro"
+        elif k.lower() == "electro":
+            genre_dict[k] = "electro"
         elif k.lower() == "eurodance":
             genre_dict[k] = "house"
 
+    for k, v in genre_dict.items():
         if v.strip().lower() == "hip hop":
             genre_dict[k] = "hip-hop"
 

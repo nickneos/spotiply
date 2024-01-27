@@ -6,7 +6,7 @@ import argparse
 import os
 from pathlib import Path
 from mltk.spotiply import *
-from mltk.genres import clean_tags
+from mltk.genres import clean_tags, scrape_genres
 from uuid import uuid4
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -21,8 +21,14 @@ def do_stuff(args):
     if args.credentials:
         generate_credentials_json()
     
-    elif args.clean_tags:
-        clean_tags(args.clean_tags)
+    elif args.clean_genres:
+        clean_tags(args.clean_genres)   
+
+    elif args.clean_genres2:
+        clean_tags(args.clean_genres2, use_artist_genre=True)
+
+    elif args.update_genres:
+        scrape_genres()
 
     elif args.liked_songs or args.liked_songs_urls:
         json_file = os.path.join(DATA_DIR, "liked_songs.json")
@@ -53,7 +59,6 @@ if __name__ == "__main__":
     group1 = parser.add_mutually_exclusive_group(required=True)
     group1.add_argument(
         "-cp",
-        "--create-playlist",
         dest="create_playlist",
         metavar="MUSIC_DIR",
         help="Create spotify playlist based on the mp3 files in MUSIC_DIR",
@@ -61,7 +66,6 @@ if __name__ == "__main__":
 
     group1.add_argument(
         "-j",
-        "--use-json",
         dest="use_json",
         metavar="JSON_FILE",
         help="Create spotify playlist using the json_file passed, instead of a music directory.",
@@ -87,14 +91,25 @@ if __name__ == "__main__":
         help="Generate txt file of the urls of your liked songs.",
     )
     group1.add_argument(
-        "--clean-tags",
-        dest="clean_tags",
+        "-g",
+        dest="clean_genres",
         metavar="MUSIC_DIR",
-        help="Clean the tag information for mp3 files in MUSIC_DIR.",
+        help="Clean the genres and other tag information for the mp3 files in MUSIC_DIR.",
+    )
+    group1.add_argument(
+        "-ga",
+        dest="clean_genres2",
+        metavar="MUSIC_DIR",
+        help="Clean the genres and other tag information (using artist to determine the genre) for the mp3 files in MUSIC_DIR.",
+    )
+    group1.add_argument(
+        "-ug",
+        dest="update_genres",
+        action="store_true",
+        help="Updates the genre mapping json.",
     )
 
     group2 = parser.add_argument_group("To be used with --create-playlist")
-
     group2.add_argument(
         "-dp",
         "--disable-playlist",

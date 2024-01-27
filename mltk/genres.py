@@ -9,16 +9,22 @@ import logging
 from bs4 import BeautifulSoup
 from pathlib import Path
 from tqdm import tqdm
-from .spotiply import spotify_connect
 from fuzzywuzzy import process
+from .spotiply import spotify_connect
+from .utils import clean_artist, clean_song_title, most_frequent
 
 URL = "https://www.chosic.com/list-of-music-genres/"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0",
 }
+DATA_FOLDER = os.path.abspath("./data")
+GENRE_LOG_FILE = os.path.join(DATA_FOLDER, ".genre_log")
+GENRES_JSON = os.path.join(DATA_FOLDER, "genres.json")
+ARTIST_GENRES_CSV = os.path.join(DATA_FOLDER, "artist_genres.csv")
+SONG_ARCHIVE = "/home/nickneos/Downloads/zspotify/ZSpotify Music/.song_archive"
 
 
-def scrape_genres(path):
+def scrape_genres(out_file=GENRES_JSON):
     headers = requests.utils.default_headers()
     headers.update(HEADERS)
     page = requests.get(URL, headers=headers)
@@ -39,17 +45,7 @@ def scrape_genres(path):
             genre_lvl_1 = genre_lvl_2
         genre_dict[genre_lvl_2] = genre_lvl_1
 
-    # dump to json file
-    with open(path, "w", encoding="utf-8") as fp:
-        json.dump(genre_dict, fp, indent=2)
-
-    return genre_dict
-
-
-def clean_genres(path):
-    with open(path, "r", encoding="utf-8") as fp:
-        genre_dict = json.load(fp)
-
+    # make adjustments
     for k, v in genre_dict.items():
         if "house" in k.lower() and v.strip().lower() == "electronic":
             genre_dict[k] = "house"
@@ -62,22 +58,29 @@ def clean_genres(path):
         elif "techno" in k.lower() and v.strip().lower() == "electronic":
             genre_dict[k] = "techno"
         elif "hardstyle" in k.lower() and v.strip().lower() == "electronic":
-            genre_dict[k] = "hardstyle"
+            genre_dict[k] = "Hardstyle"
         elif "dance" in k.lower() and v.strip().lower() == "electronic":
             genre_dict[k] = "dance"
+        elif k.lower() == "electro" and v.strip().lower() == "hip hop":
+            genre_dict[k] = "electronic"
+        elif k.lower() == "eurodance":
+            genre_dict[k] = "house"
+
+        if v.strip().lower() == "hip hop":
+            genre_dict[k] = "hip-hop"
 
     # some additions
     genre_dict["top 40"] = "pop"
     genre_dict["club"] = "club"
 
     # dump to json file
-    with open(path, "w", encoding="utf-8") as fp:
+    with open(out_file, "w", encoding="utf-8") as fp:
         json.dump(genre_dict, fp, indent=2)
 
     return genre_dict
 
 
-def clean_tag(audio, debug=False):
+def clean_tag(audio, debug=False, use_artist_genre=False):
     audio = eyed3.load(audio)
 
     # update year
@@ -89,9 +92,11 @@ def clean_tag(audio, debug=False):
     if audio.tag.genre:
         genre = audio.tag.genre.name
 
-        update_to = map_genre(genre)
-        update_to = "hip-hop" if update_to == "hip hop" else update_to
-        
+        if use_artist_genre:
+            update_to = map_artist_genre(clean_artist(audio.tag.artist))
+        else:
+            update_to = map_genre(genre)
+
         if debug:
             print("\n" + Path(audio.path).name)
             print(genre, "->", update_to)
@@ -110,21 +115,34 @@ def clean_tag(audio, debug=False):
             except:
                 print("Issue saving tag...skipping: ", audio.path)
 
+        return (genre, update_to)
 
-def clean_tags(path, debug=False):
+
+def clean_tags(path, debug=False, use_artist_genre=False, log_file=GENRE_LOG_FILE):
     logging.getLogger("eyed3").setLevel(logging.ERROR)
 
     paths = [x for x in Path(path).rglob("*.mp3")]
     if not debug:
         paths = tqdm(paths)
-    
+
     for audio in paths:
-        clean_tag(audio, debug)
+        # update genre tag
+        try:
+            before, after = clean_tag(audio, debug, use_artist_genre)
+        except:
+            continue
+
+        # log genre change
+        if not debug and after:
+            if after.lower().strip() != before.lower().strip():
+                with open(log_file, "a", encoding="utf-8") as f:
+                    csv_writer = csv.writer(f, delimiter="\t")
+                    csv_writer.writerow([audio, before, after])
 
 
 def get_spotify_genres_from_song_archive(
-    archive="/home/nickneos/Downloads/zspotify/ZSpotify Music/.song_archive",
-    csv_file="artist_genres.csv",
+    archive=SONG_ARCHIVE,
+    csv_file=ARTIST_GENRES_CSV,
 ):
     sp = spotify_connect()
 
@@ -160,25 +178,44 @@ def get_spotify_genres_from_song_archive(
                 artists_in_csv.append(a["name"])
 
 
-def map_genre(genre, genres_json="/home/nickneos/projects/spotiply/genres.json"):
+def map_genre(genre, genres_json=GENRES_JSON):
     with open(genres_json, "r", encoding="utf-8") as fp:
         genre_dict = json.load(fp)
-    
+
+    if genre:
+        # exact match
+        if g := genre_dict.get(genre.lower().strip()):
+            return g
+        # fuzzy match
+        else:
+            genres = [k for k, _ in genre_dict.items()]
+            results = process.extractBests(genre, genres, score_cutoff=87)
+            results = [x[0] for x in results]
+            results = [genre_dict.get(x.lower().strip()) for x in results]
+            return most_frequent(results)
+
+
+def map_artist_genre(artist, csv_file=ARTIST_GENRES_CSV, debug=False):
+    artist_dict = {}
+
+    # load artist genres csv
+    with open(csv_file, "r", encoding="utf-8") as f:
+        csv_reader = csv.reader(f, delimiter="|")
+        for row in csv_reader:
+            artist_dict[row[1].strip().lower()] = (
+                row[2].strip("][").replace("'", "").split(", ")
+            )
     # exact match
-    if g := genre_dict.get(genre.lower().strip()):
-        return g
+    if artist_genres := artist_dict.get(artist.strip().lower()):
+        artist_genres = [map_genre(g) for g in artist_genres]
+        return most_frequent(artist_genres)
     # fuzzy match
     else:
-        genres = [k for k, _ in genre_dict.items()]
-        results = process.extractBests(genre, genres, score_cutoff=87)
-        results = [x[0] for x in results]
-        results = [genre_dict.get(x.lower().strip()) for x in results]
-        return most_frequent(results)
-
-
-def most_frequent(list):
-    if len(list) > 0:
-        return max(set(list), key = list.count)
-    else:
-        return None    
-
+        all_artists = [k for k, _ in artist_dict.items()]
+        results = process.extractOne(artist, all_artists, score_cutoff=91)
+        if results:
+            if debug:
+                print(results)
+            return map_artist_genre(results[0])
+        else:
+            return None

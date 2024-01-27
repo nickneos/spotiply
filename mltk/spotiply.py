@@ -3,11 +3,11 @@ import os
 import time
 import spotipy
 import json
-import re
 from spotipy import util
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
 from pathlib import Path
+from .utils import clean_artist, clean_song_title
 
 CREDENTIALS = "credentials.json"
 SPOTIFY_TRACK_URL = "https://open.spotify.com/track/"
@@ -206,7 +206,7 @@ def get_liked_songs(sp, json_out, urls=False):
                     "title": item["track"]["name"],
                     "url": SPOTIFY_TRACK_URL + item["track"]["id"],
                     "track_num": counter,
-                    "json_doc": item
+                    "json_doc": item,
                 }
                 results.append(track_info)
 
@@ -222,28 +222,3 @@ def get_liked_songs(sp, json_out, urls=False):
                 f.write(f"{url}\n")
 
     return results
-
-
-def clean_song_title(title):
-    if title:
-        title = re.sub(r"\([^\)]*\)", "", title)
-        title = re.sub(r"\[[^\]]*\]", "", title)
-        title = re.sub(r"[^0-9a-zA-Z ]+", "", title.lower())
-        return title.strip()
-    else:
-        return None
-
-
-def clean_artist(artist):
-    if artist:
-        artist = (
-            artist.lower()
-            .split(" ft ")[0]
-            .split(" feat ")[0]
-            .split(" & ")[0]
-            .split(" vs ")[0]
-        )
-        artist = re.sub(r"[^0-9a-zA-Z ]+", "", artist.lower())
-        return artist.strip()
-    else:
-        return None

@@ -25,7 +25,8 @@ def do_stuff(args):
         clean_tags(args.clean_tags)
 
     elif args.liked_songs or args.liked_songs_urls:
-        get_liked_songs(sp, json_file, urls=args.liked_songs_urls)
+        json_file = os.path.join(DATA_DIR, "liked_songs.json")
+        get_liked_songs(spotify_connect(), json_file, urls=args.liked_songs_urls)
 
     elif args.create_playlist or args.use_json:
         playlist_name = uuid4().hex if args.playlist_name else args.playlist_name
@@ -48,14 +49,8 @@ if __name__ == "__main__":
         description="Create a spotify playlist based on the mp3 files in a directory.",
     )
     # group1 = parser.add_mutually_exclusive_group(required=False)
-    parser.add_argument(
-        "-c",
-        "--credentials",
-        dest="credentials",
-        action="store_true",
-        help="Generate credentials.json file",
-    )
-    group1 = parser.add_argument_group()
+
+    group1 = parser.add_mutually_exclusive_group(required=True)
     group1.add_argument(
         "-cp",
         "--create-playlist",
@@ -63,47 +58,57 @@ if __name__ == "__main__":
         metavar="MUSIC_DIR",
         help="Create spotify playlist based on the mp3 files in MUSIC_DIR",
     )
+
     group1.add_argument(
-        "-dp",
-        "--disable-playlist",
-        dest="disable_playlist",
-        action="store_true",
-        help="Do all tasks, except creating the actual spotify playlist",
-    )
-    group1.add_argument(
-        "-p",
-        "--playlist-name",
-        dest="playlist_name",
-        type=str,
-        help="Name of the playlist you want to create. If not provided will use a uuid.",
-    )
-    parser.add_argument(
         "-j",
         "--use-json",
         dest="use_json",
         metavar="JSON_FILE",
         help="Create spotify playlist using the json_file passed, instead of a music directory.",
+    )    
+    group1.add_argument(
+        "-c",
+        "--credentials",
+        dest="credentials",
+        action="store_true",
+        help="Generate credentials.json file",
     )
-    parser.add_argument(
+    group1.add_argument(
         "-ls",
         "--liked-songs",
         dest="liked_songs",
         action="store_true",
         help="Generate json of your liked songs.",
     )
-    parser.add_argument(
+    group1.add_argument(
         "--liked-songs-urls",
         dest="liked_songs_urls",
         action="store_true",
         help="Generate txt file of the urls of your liked songs.",
     )
-    parser.add_argument(
+    group1.add_argument(
         "--clean-tags",
         dest="clean_tags",
         metavar="MUSIC_DIR",
         help="Clean the tag information for mp3 files in MUSIC_DIR.",
     )
 
+    group2 = parser.add_argument_group("To be used with --create-playlist")
+
+    group2.add_argument(
+        "-dp",
+        "--disable-playlist",
+        dest="disable_playlist",
+        action="store_true",
+        help="Will disable creating the actual spotify playlist.",
+    )
+    group2.add_argument(
+        "-p",
+        "--playlist-name",
+        dest="playlist_name",
+        type=str,
+        help="Name of the playlist you want to create. If not provided will use a uuid.",
+    )
     parser.set_defaults(func=do_stuff)
 
     args = parser.parse_args()

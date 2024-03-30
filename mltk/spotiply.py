@@ -1,22 +1,29 @@
-import eyed3
-import os
-import time
-import spotipy
-import json
 import csv
-from urllib.parse import unquote, urlparse
+import eyed3
+import json
+import logging
+import os
+import spotipy
+import time
+from pathlib import Path, PurePosixPath
 from spotipy import util
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
-from pathlib import Path, PurePosixPath
+from urllib.parse import unquote, urlparse
+
+# my modules
 from .utils import clean_artist, clean_song_title
 
+# constants
 CREDENTIALS = "credentials.json"
 SPOTIFY_TRACK_URL = "https://open.spotify.com/track/"
 
+# initialise logging
+logger = logging.getLogger(__name__)
+
 
 def music_dir_to_json(path, out_file):
-    print("Exporting songs to text file...")
+    logger.info("Exporting songs to text file...")
     songs = []
     for file in sorted(os.listdir(path)):
         if file.endswith(".mp3"):
@@ -33,7 +40,7 @@ def music_dir_to_json(path, out_file):
 
 
 def rbox_to_json(txt_file, out_file):
-    print("Exporting songs to text file...")
+    logger.info("Exporting songs to text file...")
     songs = []
 
     with open(txt_file, "r", encoding="utf-16", newline="") as f:
@@ -54,7 +61,7 @@ def get_spotify_track_id(sp, json_file):
         songs = json.load(f)
 
     # loop over song names and search for them on spotify
-    print("Searching for songs...")
+    logger.info("Searching for songs...")
     for song in tqdm(songs):
         result = search_spotify_song(sp, song["artist"], song["title"])
 
@@ -121,9 +128,9 @@ def create_spotify_playlist(sp, playlist_name, json_file):
             n_songs_spotify += 1
             if song["spotify"]["id"] not in song_ids:
                 song_ids.append(song["spotify"]["id"])
-    print("no of songs", n_songs)
-    print("no of song_id's", n_songs_spotify)
-    print("no of unique song_id's", len(song_ids))
+    logger.info("no of songs", n_songs)
+    logger.info("no of song_id's", n_songs_spotify)
+    logger.info("no of unique song_id's", len(song_ids))
 
     # create a playlist for current user with provided name
     user_id = sp.me()["id"]
@@ -138,7 +145,7 @@ def create_spotify_playlist(sp, playlist_name, json_file):
     ]
 
     # add found songs to playlist
-    print("Adding songs to playlist...")
+    logger.info("Adding songs to playlist...")
     playlist_id = playlists[0][1]  # get the first playlist matching the name
     batch_size = 10
     for i in tqdm(range(0, len(song_ids), batch_size)):
@@ -222,6 +229,7 @@ def get_liked_songs(sp, csv_out="data/liked_songs.csv"):
             for item in response["items"]:
                 counter += 1
                 add_track_data_to_csv(item, counter, csv_out)
+        logger.info(f"Generated liked songs file: {csv_out}")
 
 
 def get_playlist_items(sp, url, csv_out=None):

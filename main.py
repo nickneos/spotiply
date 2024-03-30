@@ -3,14 +3,45 @@ Create a spotify playlist based on the mp3 files in a directory.
 """
 
 import argparse
+import logging
 import os
+import sys
 from pathlib import Path
-from mltk.spotiply import *
-from mltk.genres import clean_tags, scrape_genres
 from uuid import uuid4
+
+# my modules
+from mltk.genres import clean_tags, scrape_genres
+from mltk.spotiply import (
+    get_liked_songs,
+    get_playlist_items,
+    create_spotify_playlist,
+    generate_credentials_json,
+    spotify_connect,
+    get_spotify_track_id,
+    music_dir_to_json,
+    rbox_to_json,
+)
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR = os.path.join(THIS_DIR, "data/")
+
+# initialise logging
+logger = logging.getLogger(__name__)
+
+
+def configure_logger(log_to_screen=False):
+    """Setup the logger"""
+    handlers = [logging.FileHandler("mltk.log", mode="w")]
+
+    if log_to_screen:
+        handlers.append(logging.StreamHandler(sys.stdout))
+
+    logging.basicConfig(
+        handlers=handlers,
+        format="%(asctime)s.%(msecs)03d %(name)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+    )
 
 
 def parse_args():
@@ -98,6 +129,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    configure_logger(log_to_screen=True)
 
     # create data dir if doesnt exist
     Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
@@ -110,12 +142,12 @@ if __name__ == "__main__":
 
         elif args.liked_songs:
             get_liked_songs(sp)
-        
+
         elif args.playlist_songs:
             get_playlist_items(sp, args.playlist_songs)
 
         elif args.create_playlist or args.use_json or args.use_rb:
-            playlist_name =  args.playlist_name if args.playlist_name else uuid4().hex
+            playlist_name = args.playlist_name if args.playlist_name else uuid4().hex
             json_file = os.path.join(DATA_DIR, playlist_name + ".json")
 
             if args.use_json:

@@ -6,6 +6,7 @@ import json
 import requests
 import time
 import logging
+import unicodedata
 from bs4 import BeautifulSoup
 from pathlib import Path
 from tqdm import tqdm
@@ -89,42 +90,81 @@ def scrape_genres(out_file=GENRES_JSON):
     return genre_dict
 
 
-def clean_tag(audio, debug=False, use_artist_genre=False):
+def clean_tag(
+    audio,
+    debug=False,
+    use_artist_genre=False,
+    update_year=True,
+    update_genre=True,
+    clean_accents=True,
+):
     audio = eyed3.load(audio)
-
-    # update year
-    if not debug:
-        if audio.tag.original_release_date:
+    tag_changed = False
+    
+    ### update year
+    if not debug and update_year:
+        if audio.tag.recording_date != audio.tag.original_release_date:
             audio.tag.recording_date = audio.tag.original_release_date
+            tag_changed = True
 
-    # update genre
+    ### remove accents
+    if not debug and clean_accents:
+        try:
+            artist_clean = remove_accents(audio.tag.artist)
+            if audio.tag.artist != artist_clean:
+                audio.tag.artist = artist_clean
+                tag_changed = True
+        except:
+            pass
+
+        try:
+            albumartist_clean = remove_accents(audio.tag.album_artist)
+            if audio.tag.album_artist != albumartist_clean:
+                audio.tag.album_artist = albumartist_clean
+                tag_changed = True
+        except:
+            pass
+
+        try:
+            title_clean = remove_accents(audio.tag.title)
+            if audio.tag.title != title_clean:
+                audio.tag.title = title_clean
+                tag_changed = True
+        except:
+            pass
+
+    ### update genre
     if audio.tag.genre:
-        genre = audio.tag.genre.name
+        og_genre = audio.tag.genre.name
 
+        # get mapped genre
         if use_artist_genre:
             update_to = map_artist_genre(clean_artist(audio.tag.artist))
         else:
-            update_to = map_genre(genre)
+            update_to = map_genre(og_genre)
 
+        # print debug info
         if debug:
             print("\n" + Path(audio.path).name)
-            print(genre, "->", update_to)
-        else:
+            print(og_genre, "->", update_to)
+
+        # update actual genre tag
+        elif update_genre and update_to.lower() != og_genre.lower():
             #  copy original genre to comments
             if not debug and audio.tag.comments.get("genre") is None:
-                audio.tag.comments.set(f"{genre}", "genre")
+                audio.tag.comments.set(f"{og_genre}", "genre")
 
             # actually update the genre tag
-            if update_to:
-                audio.tag.genre = update_to
+            audio.tag.genre = update_to
+            tag_changed = True
 
-            # save tag
-            try:
-                audio.tag.save(preserve_file_time=True)
-            except:
-                print("Issue saving tag...skipping: ", audio.path)
-
-        return (genre, update_to)
+    ### save tag
+    if tag_changed:
+        try:
+            audio.tag.save(preserve_file_time=True)
+        except:
+            print("Issue saving tag...skipping: ", audio.path)
+        print_audio_info(audio)
 
 
 def clean_tags(path, debug=False, use_artist_genre=False, log_file=GENRE_LOG_FILE):
@@ -137,16 +177,17 @@ def clean_tags(path, debug=False, use_artist_genre=False, log_file=GENRE_LOG_FIL
     for audio in paths:
         # update genre tag
         try:
-            before, after = clean_tag(audio, debug, use_artist_genre)
+            # before, after =
+            clean_tag(audio, debug, use_artist_genre)
         except:
             continue
 
-        # log genre change
-        if not debug and after:
-            if after.lower().strip() != before.lower().strip():
-                with open(log_file, "a", encoding="utf-8") as f:
-                    csv_writer = csv.writer(f, delimiter="\t")
-                    csv_writer.writerow([audio, before, after])
+        # # log genre change
+        # if not debug and after:
+        #     if after.lower().strip() != before.lower().strip():
+        #         with open(log_file, "a", encoding="utf-8") as f:
+        #             csv_writer = csv.writer(f, delimiter="\t")
+        #             csv_writer.writerow([audio, before, after])
 
 
 def get_spotify_genres_from_song_archive(
@@ -228,3 +269,29 @@ def map_artist_genre(artist, csv_file=ARTIST_GENRES_CSV, debug=False):
             return map_artist_genre(results[0])
         else:
             return None
+
+
+def remove_accents(input_str):
+    nfkd_form = unicodedata.normalize("NFKD", input_str)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+
+
+def print_audio_info(audio):
+
+    print("\n" + audio.path)
+    for attr in dir(audio.tag):
+        if attr in [
+            "recording_date",
+            "original_release_date",
+            "artist",
+            "album_artist",
+            "album",
+            "title",
+            "genre",
+            "comments",
+        ]:
+            try:
+                print(str(attr).upper() + ': ' + str(getattr(audio.tag, attr)))
+            except:
+                pass
+

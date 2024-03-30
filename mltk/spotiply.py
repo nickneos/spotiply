@@ -3,10 +3,12 @@ import os
 import time
 import spotipy
 import json
+import csv
+from urllib.parse import unquote, urlparse
 from spotipy import util
 from spotipy.oauth2 import SpotifyOAuth
 from tqdm import tqdm
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from .utils import clean_artist, clean_song_title
 
 CREDENTIALS = "credentials.json"
@@ -24,7 +26,23 @@ def music_dir_to_json(path, out_file):
             song = {"artist": audio.tag.artist, "title": audio.tag.title}
             songs.append(song)
 
-    with open(out_file, "w", encoding="utf-8") as f:
+    with open(out_file, "w", encoding="utf-8", newline="") as f:
+        json.dump(songs, f, indent=4)
+
+    return songs
+
+
+def rbox_to_json(txt_file, out_file):
+    print("Exporting songs to text file...")
+    songs = []
+
+    with open(txt_file, "r", encoding="utf-16", newline="") as f:
+        dr = csv.DictReader(f, delimiter="\t")
+        for row in dr:
+            song = {"artist": row["Artist"].split(", ")[0], "title": row["Track Title"]}
+            songs.append(song)
+
+    with open(out_file, "w", encoding="utf-8", newline="") as f:
         json.dump(songs, f, indent=4)
 
     return songs
@@ -186,11 +204,14 @@ def generate_credentials_json():
     print("\nSaved to", CREDENTIALS)
 
 
-def get_liked_songs(sp, json_out, urls=False):
+def get_liked_songs(sp, csv_out="data/liked_songs.csv"):
     # get the songs
-    results = []
     batch_size = 50  # 50 is the most spotify will return at a time
     counter = 0
+
+    with open(csv_out, "w", encoding="utf-8") as f:
+        csv_writer = csv.writer(f, delimiter="\t")
+        csv_writer.writerow(["Num", "Title", "Artists", "TrackID", "URL"])
 
     if sp:
         for i in range(0, 10000000, batch_size):
@@ -200,25 +221,47 @@ def get_liked_songs(sp, json_out, urls=False):
 
             for item in response["items"]:
                 counter += 1
-                track_info = {
-                    "id": item["track"]["id"],
-                    "artist": item["track"]["artists"][0]["name"],
-                    "title": item["track"]["name"],
-                    "url": SPOTIFY_TRACK_URL + item["track"]["id"],
-                    "track_num": counter,
-                    "json_doc": item,
-                }
-                results.append(track_info)
+                add_track_data_to_csv(item, counter, csv_out)
 
-    # dump to json
-    with open(json_out, "w", encoding="utf-8") as fp:
-        json.dump(results, fp, indent=2)
 
-    if urls:
-        urls = [track["url"] for track in results]
-        filename = os.path.join(Path(json_out).parent, Path(json_out).stem + ".urls")
-        with open(filename, "w", encoding="utf-8") as f:
-            for url in urls:
-                f.write(f"{url}\n")
+def get_playlist_items(sp, url, csv_out=None):
+    batch_size = 50  # 50 is the most spotify will return at a time
+    counter = 0
 
-    return results
+    if not csv_out:
+        try:
+            csv_out = (
+                "data/" + PurePosixPath(unquote(urlparse(url).path)).parts[2] + ".csv"
+            )
+        except:
+            csv_out = "data/playlist.csv"
+
+    with open(csv_out, "w", encoding="utf-8") as f:
+        csv_writer = csv.writer(f, delimiter="\t")
+        csv_writer.writerow(["Num", "Title", "Artists", "TrackID", "URL"])
+
+    if sp:
+        for i in range(0, 10000000, batch_size):
+            response = sp.playlist_items(url, offset=i, limit=batch_size)
+            if len(response["items"]) == 0:
+                break
+
+            for item in response["items"]:
+                counter += 1
+                add_track_data_to_csv(item, counter, csv_out)
+
+
+def add_track_data_to_csv(item, track_num, csv_file):
+    track_id = "" if not item["track"]["id"] else item["track"]["id"]
+
+    track_info = [
+        track_num,
+        item["track"]["name"],
+        ", ".join([a["name"] for a in item["track"]["artists"]]),
+        track_id,
+        SPOTIFY_TRACK_URL + track_id,
+    ]
+
+    with open(csv_file, "a", encoding="utf-8") as f:
+        csv_writer = csv.writer(f, delimiter="\t")
+        csv_writer.writerow(track_info)

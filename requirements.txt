@@ -1,5 +1,5 @@
-tqdm
-spotipy
-eyed3
-fuzzywuzzy
-python-Levenshtein
+eyed3==0.9.7
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.23.0
+spotipy==2.23.0
+tqdm==4.66.1

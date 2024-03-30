@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def music_dir_to_json(path, out_file):
-    logger.info("Exporting songs to text file...")
+    logger.info(f"Exporting songs to {out_file}")
     songs = []
     for file in sorted(os.listdir(path)):
         if file.endswith(".mp3"):
@@ -40,7 +40,7 @@ def music_dir_to_json(path, out_file):
 
 
 def rbox_to_json(txt_file, out_file):
-    logger.info("Exporting songs to text file...")
+    logger.info(f"Exporting reckordbox txt file to {out_file}")
     songs = []
 
     with open(txt_file, "r", encoding="utf-16", newline="") as f:
@@ -61,7 +61,7 @@ def get_spotify_track_id(sp, json_file):
         songs = json.load(f)
 
     # loop over song names and search for them on spotify
-    logger.info("Searching for songs...")
+    logger.info(f"Songs in {json_file} to be searched on spotify")
     for song in tqdm(songs):
         result = search_spotify_song(sp, song["artist"], song["title"])
 
@@ -83,6 +83,7 @@ def get_spotify_track_id(sp, json_file):
     # update json file with spotify details
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(songs, f, indent=4)
+        logger.info(f"Updated {json_file} with spotify details")
 
     return songs
 
@@ -102,15 +103,20 @@ def search_spotify_song(sp, artist, title):
         # we'll assume first result is correct and save its id
         results = sp.search(q=query, limit=1, type="track")
         result = results["tracks"]["items"][0]
+        logger.debug(result)
     except IndexError:
         return None
 
-    return {
-        "id": result["id"],
-        "artist": result["artists"][0]["name"],
-        "title": result["name"],
-        "url": SPOTIFY_TRACK_URL + result["id"],
-    }
+    try:
+        return {
+            "id": result["id"],
+            "artist": result["artists"][0]["name"],
+            "title": result["name"],
+            "url": SPOTIFY_TRACK_URL + result["id"],
+        }
+    except Exception as e:
+        logger.error(f"{type(e).__name__} - {e}")
+        return None
 
 
 def create_spotify_playlist(sp, playlist_name, json_file):
@@ -128,9 +134,9 @@ def create_spotify_playlist(sp, playlist_name, json_file):
             n_songs_spotify += 1
             if song["spotify"]["id"] not in song_ids:
                 song_ids.append(song["spotify"]["id"])
-    logger.info("no of songs", n_songs)
-    logger.info("no of song_id's", n_songs_spotify)
-    logger.info("no of unique song_id's", len(song_ids))
+    logger.info(f"no of songs {n_songs}")
+    logger.info(f"no of song_id's {n_songs_spotify}")
+    logger.info(f"no of unique song_id's {len(song_ids)}")
 
     # create a playlist for current user with provided name
     user_id = sp.me()["id"]
@@ -191,9 +197,7 @@ def spotify_connect():
 def generate_credentials_json():
     print("\n")
     print("To connect to spotify we require some tokens")
-    print(
-        "Register app to get tokens first at: https://developer.spotify.com/dashboard/"
-    )
+    print("Register app to get tokens first at: https://developer.spotify.com/dashboard/")
 
     while True:
         resp = input("\nHas this been done? (y/n) ")

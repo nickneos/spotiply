@@ -24,6 +24,9 @@ GENRES_JSON = os.path.join(DATA_FOLDER, "genres.json")
 ARTIST_GENRES_CSV = os.path.join(DATA_FOLDER, "artist_genres.csv")
 SONG_ARCHIVE = "/home/nickneos/Downloads/zspotify/ZSpotify Music/.song_archive"
 
+# initialise logging
+logger = logging.getLogger(__name__)
+
 
 def scrape_genres(out_file=GENRES_JSON):
     headers = requests.utils.default_headers()
@@ -86,6 +89,8 @@ def scrape_genres(out_file=GENRES_JSON):
     # dump to json file
     with open(out_file, "w", encoding="utf-8") as fp:
         json.dump(genre_dict, fp, indent=2)
+
+    logger.info(f"Scraped genres to {out_file}")
 
     return genre_dict
 
@@ -163,13 +168,11 @@ def clean_tag(
         try:
             audio.tag.save(preserve_file_time=True)
         except:
-            print("Issue saving tag...skipping: ", audio.path)
-        print_audio_info(audio)
+            logger.warning(f"Issue saving tag...skipping: {audio.path}")
+        logger.info(f"Saved tag: {audio}")
 
 
 def clean_tags(path, debug=False, use_artist_genre=False, log_file=GENRE_LOG_FILE):
-    logging.getLogger("eyed3").setLevel(logging.ERROR)
-
     paths = [x for x in Path(path).rglob("*.mp3")]
     if not debug:
         paths = tqdm(paths)
@@ -208,7 +211,7 @@ def get_spotify_genres_from_song_archive(
 
     # open archive
     with open(archive, "r", encoding="utf-8") as f:
-        print("Reading .song_archive....")
+        logger.info(f"Reading {archive}")
 
         for line in tqdm(f.readlines()):
             row = line.split("\t")

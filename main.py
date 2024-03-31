@@ -4,6 +4,7 @@ Create a spotify playlist based on the mp3 files in a directory.
 
 import argparse
 import logging
+import colorlog
 import os
 import sys
 from pathlib import Path
@@ -25,23 +26,57 @@ from mltk.spotiply import (
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR = os.path.join(THIS_DIR, "data/")
 
-# initialise logging
-logger = logging.getLogger(__name__)
-
 
 def configure_logger(log_to_screen=False):
     """Setup the logger"""
-    handlers = [logging.FileHandler("mltk.log", mode="w")]
 
-    if log_to_screen:
-        handlers.append(logging.StreamHandler(sys.stdout))
+    # initialise logger
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
 
-    logging.basicConfig(
-        handlers=handlers,
-        format="%(asctime)s.%(msecs)03d %(name)s %(levelname)s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO,
+    # setup formatters
+    formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s: %(message)s')
+    color_formatter = colorlog.ColoredFormatter(
+        "%(green)s%(asctime)s%(reset)s %(light_black)s%(name)s%(reset)s %(log_color)s%(levelname)s:%(reset)s %(message)s",
+        reset=True,
+        log_colors={
+            'DEBUG':    'cyan',
+            'INFO':     'green',
+            'WARNING':  'yellow',
+            'ERROR':    'red',
+            'CRITICAL': 'red,bg_white',
+        },
     )
+
+    # add file handler
+    fh = logging.FileHandler("mltk.log", mode="w")
+    fh.setFormatter(formatter)
+    fh.setLevel(logging.INFO)
+    logger.addHandler(fh)
+
+    # add console handler
+    if log_to_screen:
+        ch = colorlog.StreamHandler()
+        ch.setFormatter(color_formatter)
+        # ch.setLevel(logging.DEBUG)
+        logger.addHandler(ch)
+
+    # other loggers
+    loggers = [
+        "mltk.spotiply",
+        "mltk.genres",
+    ]
+    for logger_name in loggers:
+        _logger = logging.getLogger(logger_name)
+        _logger.setLevel(logging.DEBUG)
+        _logger.addHandler(fh)
+        if log_to_screen:
+            _logger.addHandler(ch)
+
+    # logger from other libraries
+    logging.getLogger("eyed3").setLevel(logging.ERROR)
+
+    return logger
 
 
 def parse_args():
@@ -129,7 +164,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    configure_logger(log_to_screen=True)
+    logger = configure_logger(log_to_screen=True)
 
     # create data dir if doesnt exist
     Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
